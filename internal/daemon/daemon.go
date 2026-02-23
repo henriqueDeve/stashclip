@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"os"
 	"os/signal"
-	"time"
 
 	"stashclip/internal/clipboard"
 	"stashclip/internal/store"
@@ -12,8 +11,11 @@ import (
 
 // Run starts the clipboard monitoring loop and blocks until interrupted.
 func Run(backend clipboard.Backend, store *store.Store) error {
-	ticker := time.NewTicker(300 * time.Millisecond)
-	defer ticker.Stop()
+	watcher, err := clipboard.NewX11EventWatcher()
+	if err != nil {
+		return err
+	}
+	defer watcher.Close()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -26,7 +28,14 @@ func Run(backend clipboard.Backend, store *store.Store) error {
 		select {
 		case <-sig:
 			return nil
-		case <-ticker.C:
+		case err := <-watcher.Errors():
+			if err != nil {
+				return err
+			}
+		case _, ok := <-watcher.Events():
+			if !ok {
+				return nil
+			}
 			text, err := backend.Read()
 			if err != nil {
 				continue
