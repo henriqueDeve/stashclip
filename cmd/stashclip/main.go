@@ -3,6 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"stashclip/internal/clipboard"
+	"stashclip/internal/daemon"
+	"stashclip/internal/store"
 )
 
 func usage() {
@@ -23,7 +27,12 @@ func main() {
 
 	switch os.Args[1] {
 	case "daemon":
-		fmt.Println("daemon: not implemented")
+		backend := clipboard.NewX11()
+		memStore := store.New()
+		if err := daemon.Run(backend, memStore); err != nil {
+			fmt.Fprintf(os.Stderr, "daemon error: %v\n", err)
+			os.Exit(1)
+		}
 	case "list":
 		fmt.Println("list: not implemented")
 	case "pick":

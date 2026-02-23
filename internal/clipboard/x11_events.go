@@ -1,10 +1,9 @@
 package clipboard
 
 import (
-	"errors"
-
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/xfixes"
+	"github.com/BurntSushi/xgb/xproto"
 )
 
 // X11EventWatcher notifies when the X11 clipboard changes.
@@ -26,17 +25,17 @@ func NewX11EventWatcher() (*X11EventWatcher, error) {
 		return nil, err
 	}
 
-	root := conn.Setup().DefaultScreen(conn).Root
-	atomCookie := xgb.InternAtom(conn, true, uint16(len("CLIPBOARD")), "CLIPBOARD")
+	root := xproto.Setup(conn).DefaultScreen(conn).Root
+	atomCookie := xproto.InternAtom(conn, true, uint16(len("CLIPBOARD")), "CLIPBOARD")
 	atomReply, err := atomCookie.Reply()
 	if err != nil {
 		conn.Close()
 		return nil, err
 	}
 
-	mask := xfixes.SelectionEventMaskSetSelectionOwner |
+	mask := uint32(xfixes.SelectionEventMaskSetSelectionOwner |
 		xfixes.SelectionEventMaskSelectionWindowDestroy |
-		xfixes.SelectionEventMaskSelectionClientClose
+		xfixes.SelectionEventMaskSelectionClientClose)
 
 	xfixes.SelectSelectionInput(conn, root, atomReply.Atom, mask)
 
@@ -65,19 +64,23 @@ func (w *X11EventWatcher) Close() error {
 	if w.conn == nil {
 		return nil
 	}
-	return w.conn.Close()
+	w.conn.Close()
+	w.conn = nil
+	return nil
 }
 
 func (w *X11EventWatcher) loop() {
 	for {
 		event, err := w.conn.WaitForEvent()
 		if err != nil {
-			if !errors.Is(err, xgb.ErrInvalidConn) {
-				select {
-				case w.errs <- err:
-				default:
-				}
+			select {
+			case w.errs <- err:
+			default:
 			}
+			close(w.events)
+			return
+		}
+		if event == nil {
 			close(w.events)
 			return
 		}
