@@ -1,0 +1,13 @@
+[Unit]
+Description=Stashclip Clipboard Daemon
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/stashclip daemon run
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
