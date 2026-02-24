@@ -1,4 +1,4 @@
-name: Release Ubuntu Bundles
+name: Release Ubuntu Artifacts
 
 on:
   push:
@@ -31,10 +31,12 @@ jobs:
             exit 1
           fi
 
-      - name: Build Ubuntu bundles
+      - name: Build Ubuntu artifacts
         run: |
           ./scripts/build_ubuntu_bundle.sh amd64
           ./scripts/build_ubuntu_bundle.sh arm64
+          ./scripts/build_ubuntu_deb.sh amd64
+          ./scripts/build_ubuntu_deb.sh arm64
 
       - name: Publish GitHub Release assets
         uses: softprops/action-gh-release@v2
@@ -43,3 +45,5 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
+            dist/*.deb
+            dist/*.deb.sha256
