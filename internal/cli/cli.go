@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +13,7 @@ import (
 
 	"stashclip/internal/clipboard"
 	"stashclip/internal/daemon"
+	"stashclip/internal/popup"
 	"stashclip/internal/store"
 )
 
@@ -33,7 +32,9 @@ func Run(args []string) error {
 	case "pick":
 		return runPick(args[2:])
 	case "menu":
-		return runMenu()
+		return runPopup()
+	case "popup":
+		return runPopup()
 	case "clear":
 		return runClear()
 	case "-h", "--help", "help":
@@ -53,7 +54,8 @@ func usage() {
 	fmt.Println("  daemon  Manage daemon (start/run/stop/status)")
 	fmt.Println("  list    List stored entries")
 	fmt.Println("  pick    Pick an entry to paste")
-	fmt.Println("  menu    Interactive picker to paste")
+	fmt.Println("  menu    Open popup picker")
+	fmt.Println("  popup   Open popup picker")
 	fmt.Println("  clear   Clear stored entries")
 }
 
@@ -155,9 +157,22 @@ func stopDaemon() error {
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("daemon error: %w", err)
 	}
-	_ = os.Remove(pidPath)
-	fmt.Printf("daemon stopped (pid %d)\n", pid)
-	return nil
+	if waitProcessStop(pid, 3*time.Second) {
+		_ = os.Remove(pidPath)
+		fmt.Printf("daemon stopped (pid %d)\n", pid)
+		return nil
+	}
+
+	if err := proc.Signal(syscall.SIGKILL); err != nil {
+		return fmt.Errorf("daemon error: failed to stop pid %d after timeout: %w", pid, err)
+	}
+	if waitProcessStop(pid, 1*time.Second) {
+		_ = os.Remove(pidPath)
+		fmt.Printf("daemon stopped (pid %d)\n", pid)
+		return nil
+	}
+
+	return fmt.Errorf("daemon error: process %d did not stop", pid)
 }
 
 func daemonStatus() error {
@@ -211,39 +226,35 @@ func runPick(args []string) error {
 	return writePickByIndex(entries, selected)
 }
 
-func runMenu() error {
-	memStore, err := newStore()
-	if err != nil {
-		return err
-	}
-	entries := memStore.List()
-	if len(entries) == 0 {
-		return fmt.Errorf("menu error: no entries available")
-	}
-
-	for i, entry := range entries {
-		text := strings.ReplaceAll(entry.Text, "\n", "\\n")
-		text = strings.ReplaceAll(text, "\t", "\\t")
-		fmt.Printf("%d\t%s\t%s\n", i+1, entry.AddedAt.Format(time.RFC3339), text)
-	}
-	fmt.Printf("Choose an entry [1-%d] (Enter for latest): ", len(entries))
-
-	in := bufio.NewReader(os.Stdin)
-	line, err := in.ReadString('\n')
-	if err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("menu error: %w", err)
-	}
-	line = strings.TrimSpace(line)
-
-	selected := len(entries)
-	if line != "" {
-		n, convErr := strconv.Atoi(line)
-		if convErr != nil {
-			return fmt.Errorf("menu error: invalid index: %s", line)
+func runPopup() error {
+	for {
+		memStore, err := newStore()
+		if err != nil {
+			return err
 		}
-		selected = n
+		entries := memStore.List()
+		if len(entries) == 0 {
+			return fmt.Errorf("popup error: no entries available")
+		}
+		items := make([]popup.Item, 0, len(entries))
+		for i, entry := range entries {
+			items = append(items, popup.Item{
+				ID:      i + 1,
+				AddedAt: entry.AddedAt,
+				Text:    entry.Text,
+			})
+		}
+		selected, err := popup.Select(items)
+		if err != nil {
+			if errors.Is(err, popup.ErrCanceled) {
+				return nil
+			}
+			return err
+		}
+		if err := writePickByIndex(entries, selected); err != nil {
+			return err
+		}
 	}
-	return writePickByIndex(entries, selected)
 }
 
 func writePickByIndex(entries []store.Entry, oneBasedIndex int) error {
@@ -360,4 +371,15 @@ func isZombieProcess(pid int) bool {
 		return false
 	}
 	return parts[2] == "Z"
+}
+
+func waitProcessStop(pid int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if !processRunning(pid) {
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return !processRunning(pid)
 }
