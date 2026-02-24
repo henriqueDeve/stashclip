@@ -41,6 +41,9 @@ func Run(clipboardProvider clipboard.ClipboardProvider, store *store.Store) erro
 			if err != nil {
 				continue
 			}
+			if clipboard.ShouldIgnore(text) {
+				continue
+			}
 			hash := sha256.Sum256([]byte(text))
 			if hasHash && hash == lastHash {
 				continue
