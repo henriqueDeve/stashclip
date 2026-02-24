@@ -5,7 +5,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/stashclip daemon run
+ExecStart=%h/.local/bin/stashclip __daemon-run
 Restart=always
 RestartSec=2
 

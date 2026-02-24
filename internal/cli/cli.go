@@ -20,43 +20,29 @@ import (
 // Run executes the CLI command based on args.
 func Run(args []string) error {
 	if len(args) < 2 {
-		usage()
-		return nil
+		return runPopup()
 	}
 
 	switch args[1] {
-	case "daemon":
-		return runDaemonCommand(args[2:])
-	case "list":
-		return runList()
-	case "pick":
-		return runPick(args[2:])
 	case "menu":
 		return runPopup()
 	case "popup":
 		return runPopup()
-	case "clear":
-		return runClear()
+	case "__daemon-run":
+		return runDaemonForeground()
 	case "-h", "--help", "help":
 		usage()
 		return nil
 	default:
-		fmt.Printf("unknown command: %s\n\n", args[1])
-		usage()
-		return nil
+		return fmt.Errorf("unsupported command: use Ctrl+Alt+A to open stashclip popup")
 	}
 }
 
 func usage() {
-	fmt.Println("Usage: stashclip <command>")
+	fmt.Println("Usage: stashclip [popup]")
 	fmt.Println()
-	fmt.Println("Commands:")
-	fmt.Println("  daemon  Manage daemon (start/run/stop/status)")
-	fmt.Println("  list    List stored entries")
-	fmt.Println("  pick    Pick an entry to paste")
-	fmt.Println("  menu    Open popup picker")
-	fmt.Println("  popup   Open popup picker")
-	fmt.Println("  clear   Clear stored entries")
+	fmt.Println("Open popup and choose an item to copy again.")
+	fmt.Println("Recommended usage: global shortcut Ctrl+Alt+A -> stashclip-popup")
 }
 
 func runDaemonCommand(args []string) error {
@@ -263,6 +249,9 @@ func writePickByIndex(entries []store.Entry, oneBasedIndex int) error {
 	}
 	clipboardProvider, err := clipboard.NewProvider()
 	if err != nil {
+		return fmt.Errorf("pick error: %w", err)
+	}
+	if err := clipboard.MarkIgnored(entries[oneBasedIndex-1].Text); err != nil {
 		return fmt.Errorf("pick error: %w", err)
 	}
 	if err := clipboardProvider.Write(entries[oneBasedIndex-1].Text); err != nil {

@@ -50,7 +50,7 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl --user daemon-reload
   systemctl --user enable --now stashclip.service
 else
-  "$BIN_DST" daemon start || true
+  nohup "$BIN_DST" __daemon-run >/dev/null 2>&1 &
 fi
 
 echo "stashclip instalado em $BIN_DST"
