@@ -10,7 +10,7 @@ import (
 )
 
 // Run starts the clipboard monitoring loop and blocks until interrupted.
-func Run(backend clipboard.Backend, store *store.Store) error {
+func Run(clipboardProvider clipboard.ClipboardProvider, store *store.Store) error {
 	watcher, err := clipboard.NewX11EventWatcher()
 	if err != nil {
 		return err
@@ -36,7 +36,7 @@ func Run(backend clipboard.Backend, store *store.Store) error {
 			if !ok {
 				return nil
 			}
-			text, err := backend.Read()
+			text, err := clipboardProvider.Read()
 			if err != nil {
 				continue
 			}
