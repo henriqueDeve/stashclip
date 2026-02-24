@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ func Run(args []string) error {
 	case "list":
 		return runList()
 	case "pick":
-		return runPick()
+		return runPick(args[2:])
 	case "clear":
 		return runClear()
 	case "-h", "--help", "help":
@@ -72,8 +73,35 @@ func runList() error {
 	return nil
 }
 
-func runPick() error {
-	fmt.Println("pick: not implemented")
+func runPick(args []string) error {
+	memStore, err := newStore()
+	if err != nil {
+		return err
+	}
+	entries := memStore.List()
+	if len(entries) == 0 {
+		return fmt.Errorf("pick error: no entries available")
+	}
+
+	selected := len(entries) - 1
+	if len(args) > 1 {
+		return fmt.Errorf("pick error: too many arguments")
+	}
+	if len(args) == 1 {
+		n, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("pick error: invalid index: %s", args[0])
+		}
+		if n < 1 || n > len(entries) {
+			return fmt.Errorf("pick error: index out of range: %d", n)
+		}
+		selected = n - 1
+	}
+
+	clipboardProvider := clipboard.NewX11()
+	if err := clipboardProvider.Write(entries[selected].Text); err != nil {
+		return fmt.Errorf("pick error: %w", err)
+	}
 	return nil
 }
 
