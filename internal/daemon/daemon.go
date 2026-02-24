@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"stashclip/internal/clipboard"
 	"stashclip/internal/store"
@@ -11,14 +12,14 @@ import (
 
 // Run starts the clipboard monitoring loop and blocks until interrupted.
 func Run(clipboardProvider clipboard.ClipboardProvider, store *store.Store) error {
-	watcher, err := clipboard.NewX11EventWatcher()
+	watcher, err := clipboard.NewEventWatcher()
 	if err != nil {
 		return err
 	}
 	defer watcher.Close()
 
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sig)
 
 	var lastHash [32]byte
