@@ -21,3 +21,14 @@ tar -xzf stashclip-<versao>-ubuntu-amd64.tar.gz
 cd stashclip-<versao>-ubuntu-amd64
 ./install.sh --install-deps
 ```
+
+## Release automatica no GitHub
+
+Ao criar uma tag `v*`, o GitHub Actions gera e publica bundles Ubuntu (`amd64` e `arm64`) na Release.
+
+Exemplo:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
