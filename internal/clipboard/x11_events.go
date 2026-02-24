@@ -1,6 +1,8 @@
 package clipboard
 
 import (
+	"fmt"
+
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/xfixes"
 	"github.com/BurntSushi/xgb/xproto"
@@ -26,18 +28,25 @@ func NewX11EventWatcher() (*X11EventWatcher, error) {
 	}
 
 	root := xproto.Setup(conn).DefaultScreen(conn).Root
-	atomCookie := xproto.InternAtom(conn, true, uint16(len("CLIPBOARD")), "CLIPBOARD")
+	atomCookie := xproto.InternAtom(conn, false, uint16(len("CLIPBOARD")), "CLIPBOARD")
 	atomReply, err := atomCookie.Reply()
 	if err != nil {
 		conn.Close()
 		return nil, err
+	}
+	if atomReply.Atom == xproto.AtomNone {
+		conn.Close()
+		return nil, fmt.Errorf("x11 clipboard atom not available")
 	}
 
 	mask := uint32(xfixes.SelectionEventMaskSetSelectionOwner |
 		xfixes.SelectionEventMaskSelectionWindowDestroy |
 		xfixes.SelectionEventMaskSelectionClientClose)
 
-	xfixes.SelectSelectionInput(conn, root, atomReply.Atom, mask)
+	if err := xfixes.SelectSelectionInputChecked(conn, root, atomReply.Atom, mask).Check(); err != nil {
+		conn.Close()
+		return nil, err
+	}
 
 	w := &X11EventWatcher{
 		conn:   conn,
