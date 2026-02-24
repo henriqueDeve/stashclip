@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	"stashclip/internal/clipboard"
 	"stashclip/internal/daemon"
@@ -28,17 +30,36 @@ func main() {
 	switch os.Args[1] {
 	case "daemon":
 		backend := clipboard.NewX11()
-		memStore := store.New()
+		memStore, err := store.New()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "store error: %v\n", err)
+			os.Exit(1)
+		}
 		if err := daemon.Run(backend, memStore); err != nil {
 			fmt.Fprintf(os.Stderr, "daemon error: %v\n", err)
 			os.Exit(1)
 		}
 	case "list":
-		fmt.Println("list: not implemented")
+		memStore, err := store.New()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "store error: %v\n", err)
+			os.Exit(1)
+		}
+		entries := memStore.List()
+		for i, entry := range entries {
+			text := strings.ReplaceAll(entry.Text, "\n", "\\n")
+			text = strings.ReplaceAll(text, "\t", "\\t")
+			fmt.Printf("%d\t%s\t%s\n", i+1, entry.AddedAt.Format(time.RFC3339), text)
+		}
 	case "pick":
 		fmt.Println("pick: not implemented")
 	case "clear":
-		fmt.Println("clear: not implemented")
+		memStore, err := store.New()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "store error: %v\n", err)
+			os.Exit(1)
+		}
+		memStore.Clear()
 	case "-h", "--help", "help":
 		usage()
 	default:
